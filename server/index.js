@@ -152,7 +152,7 @@ app.get('/api/images', async (req, res) => {
 });
 
 // Handle SPA routing - Send index.html for any other requests
-app.get('*', (req, res) => {
+app.get('(.*)', (req, res) => {
     res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
 });
 
