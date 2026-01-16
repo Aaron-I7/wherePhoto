@@ -1,7 +1,7 @@
 # Multi-stage build
 
 # Stage 1: Build Frontend
-FROM node:18-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm install
@@ -9,7 +9,7 @@ COPY client/ ./
 RUN npm run build
 
 # Stage 2: Setup Backend & Final Image
-FROM node:18-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 # Setup Server
