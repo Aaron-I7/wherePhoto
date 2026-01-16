@@ -124,10 +124,21 @@ jobs:
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
         script: |
-          # Check Environment
+          # Install Node.js if missing
           if ! command -v node &> /dev/null; then
-              echo "Error: Node.js missing. Please install Node.js v18+ manually."
-              exit 1
+              echo "Node.js not found. Installing Node.js 18..."
+              if command -v yum &> /dev/null; then
+                  # CentOS/Alibaba Cloud Linux
+                  curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+                  yum install -y nodejs
+              elif command -v apt-get &> /dev/null; then
+                  # Ubuntu/Debian
+                  curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                  apt-get install -y nodejs
+              else
+                  echo "Error: Unknown package manager. Cannot install Node.js."
+                  exit 1
+              fi
           fi
 
           # Prepare Target Directory
