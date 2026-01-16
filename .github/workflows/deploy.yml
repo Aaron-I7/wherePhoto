@@ -57,9 +57,9 @@ jobs:
     - name: Deploy via SSH
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
         script: |
           # 1. 准备目录
           mkdir -p /opt/wherePhoto
