@@ -113,6 +113,9 @@ jobs:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.SSH_PORT || '22' }}
+        timeout: 2m
+        command_timeout: 30m
         source: "deploy_package/*"
         target: "/opt/wherePhoto_temp"
         strip_components: 1
@@ -124,6 +127,9 @@ jobs:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.SSH_PORT || '22' }}
+        timeout: 2m
+        command_timeout: 30m
         script: |
           # Install Node.js if missing or too old
           if ! command -v node &> /dev/null || [[ $(node -v) != v22* ]]; then
