@@ -1,0 +1,100 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ "master", "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    # Frontend Build Test
+    - name: Set up Node.js for Client
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+
+    - name: Install Client Dependencies
+      working-directory: ./client
+      run: npm ci
+
+    - name: Build Client
+      working-directory: ./client
+      run: npm run build
+
+    # Backend Install Test
+    - name: Set up Node.js for Server
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+
+    - name: Install Server Dependencies
+      working-directory: ./server
+      run: npm ci
+
+    # Docker Build Test
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Docker Image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: false
+        tags: wherephoto:latest
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          # 1. 准备目录
+          mkdir -p /opt/wherePhoto
+          cd /opt/wherePhoto
+          
+          # 2. 拉取最新代码
+          # 如果目录为空则 clone，否则 pull
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/Aaron-I7/wherePhoto.git .
+          else
+            git pull origin master
+          fi
+          
+          # 3. 构建 Docker 镜像
+          # 注意：这里在服务器端构建，确保环境一致性
+          docker build -t wherephoto .
+          
+          # 4. 停止并移除旧容器
+          if [ "$(docker ps -q -f name=wherephoto-app)" ]; then
+              docker stop wherephoto-app
+          fi
+          if [ "$(docker ps -aq -f name=wherephoto-app)" ]; then
+              docker rm wherephoto-app
+          fi
+          
+          # 5. 启动新容器
+          # -p 3000:3000: 端口映射
+          # -v: 挂载上传目录，保证重新部署后图片不丢失
+          # --restart unless-stopped: 自动重启
+          docker run -d \
+            -p 3000:3000 \
+            --name wherephoto-app \
+            -v $(pwd)/server/uploads:/app/uploads \
+            --restart unless-stopped \
+            wherephoto
+            
+          # 6. 清理未使用的镜像 (可选)
+          docker image prune -f
