@@ -1,10 +1,14 @@
-const express = require('express');
-const multer = require('multer');
-const cors = require('cors');
-const fs = require('fs-extra');
-const path = require('path');
-const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import multer from 'multer';
+import cors from 'cors';
+import fs from 'fs-extra';
+import path from 'path';
+import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
