@@ -90,7 +90,7 @@ jobs:
           mkdir -p /opt/wherePhoto
           cd /opt/wherePhoto
 
-          # 3. Pull Latest Code
+          # 3. Pull Latest Code 
           echo "Pulling latest code..."
           if [ ! -d ".git" ]; then
             git clone https://github.com/Aaron-I7/wherePhoto.git .
