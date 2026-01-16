@@ -54,82 +54,92 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     steps:
-    - name: Deploy via SSH
+    # 1. Checkout Code
+    - uses: actions/checkout@v3
+
+    # 2. Build Frontend (Locally in Action)
+    - name: Set up Node.js for Build
+      uses: actions/setup-node@v3
+      with:
+        node-version: 22
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+
+    - name: Build Frontend
+      working-directory: ./client
+      run: |
+        npm ci
+        npm run build
+
+    # 3. Prepare Deployment Package
+    - name: Prepare Deployment Artifacts
+      run: |
+        mkdir -p deploy_package/server
+        # Copy Server Code
+        cp -r server/* deploy_package/server/
+        # Copy Frontend Build
+        mkdir -p deploy_package/server/public
+        cp -r client/dist/* deploy_package/server/public/
+        # Remove local node_modules from server to avoid conflicts
+        rm -rf deploy_package/server/node_modules
+        # Create deployment script
+        cat > deploy_package/deploy.sh << 'EOF'
+        #!/bin/bash
+        cd /opt/wherePhoto/server
+        
+        # Install dependencies
+        echo "Installing production dependencies..."
+        npm install --production --registry=https://registry.npmmirror.com
+
+        # Start/Restart Service via PM2
+        echo "Starting Service..."
+        if ! command -v pm2 &> /dev/null; then
+            npm install -g pm2 --registry=https://registry.npmmirror.com
+        fi
+
+        if pm2 describe wherephoto > /dev/null; then
+            pm2 reload wherephoto
+        else
+            pm2 start index.js --name wherephoto
+        fi
+        pm2 save
+        EOF
+
+    # 4. Upload Files via SCP
+    - name: Copy Files via SCP
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        source: "deploy_package/*"
+        target: "/opt/wherePhoto_temp"
+        strip_components: 1
+
+    # 5. Execute Deployment Script
+    - name: Execute Deployment
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
-        command_timeout: 30m
         script: |
-          # ====================================================
-          # Direct Node.js Deployment Script (No Docker) 
-          # ====================================================
-
-          # 1. Environment Check
-          echo "Checking environment..."
+          # Check Environment
           if ! command -v node &> /dev/null; then
-              echo "Error: Node.js is not installed."
-              echo "Please install Node.js (v18+) on the server first."
+              echo "Error: Node.js missing. Please install Node.js v18+ manually."
               exit 1
           fi
 
-          if ! command -v git &> /dev/null; then
-              echo "Error: Git is not installed."
-              echo "Please install Git on the server first."
-              exit 1
-          fi
-
-          if ! command -v pm2 &> /dev/null; then
-              echo "Installing PM2 globally..."
-              npm install -g pm2
-          fi
-
-          # 2. Setup Workspace
-          echo "Setting up workspace..."
+          # Prepare Target Directory
           mkdir -p /opt/wherePhoto
-          cd /opt/wherePhoto
-
-          # 3. Pull Latest Code 
-          echo "Pulling latest code..."
-          if [ ! -d ".git" ]; then
-            git clone https://github.com/Aaron-I7/wherePhoto.git .
-          else
-            # Reset to avoid conflicts
-            git fetch --all
-            git reset --hard origin/master
-          fi
-
-          # 4. Install & Build Frontend
-          echo "Building Frontend..."
-          cd client
-          npm install
-          npm run build
           
-          # Move build artifacts to server public directory
-          echo "Deploying Frontend artifacts..."
-          rm -rf ../server/public
-          mkdir -p ../server/public
-          cp -r dist/* ../server/public/
+          # Move files from temp to target (Atomic update)
+          echo "Updating files..."
+          rsync -av --delete /opt/wherePhoto_temp/ /opt/wherePhoto/
+          rm -rf /opt/wherePhoto_temp
 
-          # 5. Install Backend
-          echo "Installing Backend dependencies..."
-          cd ../server
-          npm install --production
-
-          # 6. Start/Restart Service via PM2
-          echo "Starting Service..."
-          # Check if app is running
-          if pm2 describe wherephoto > /dev/null; then
-              echo "Reloading existing service..."
-              pm2 reload wherephoto
-          else
-              echo "Starting new service..."
-              pm2 start index.js --name wherephoto
-          fi
+          # Run local deploy script
+          echo "Running deploy script..."
+          bash /opt/wherePhoto/deploy.sh
           
-          # Save PM2 list to resurrect on reboot
-          pm2 save
-          
-          echo "Deployment Complete!"
-          echo "Service is running on port 3000"
+          echo "Deployment Success!"
