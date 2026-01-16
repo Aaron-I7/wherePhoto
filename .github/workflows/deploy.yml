@@ -103,6 +103,7 @@ jobs:
             pm2 start index.js --name wherephoto
         fi
         pm2 save
+        pm2 status
         EOF
 
     # 4. Upload Files via SCP
@@ -141,12 +142,25 @@ jobs:
               fi
           fi
 
+          # Install rsync if missing
+          if ! command -v rsync &> /dev/null; then
+              echo "Installing rsync..."
+              if command -v yum &> /dev/null; then
+                  yum install -y rsync
+              elif command -v apt-get &> /dev/null; then
+                  apt-get install -y rsync
+              fi
+          fi
+
           # Prepare Target Directory
           mkdir -p /opt/wherePhoto
           
-          # Move files from temp to target (Atomic update)
+          # Move files from temp to target (Atomic update, protecting uploads)
           echo "Updating files..."
-          rsync -av --delete /opt/wherePhoto_temp/ /opt/wherePhoto/
+          # Ensure uploads directory exists to prevent errors
+          mkdir -p /opt/wherePhoto/server/uploads
+          
+          rsync -av --delete --exclude 'server/uploads' /opt/wherePhoto_temp/ /opt/wherePhoto/
           rm -rf /opt/wherePhoto_temp
 
           # Run local deploy script
