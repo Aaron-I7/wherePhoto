@@ -50,10 +50,12 @@ const upload = multer({ storage });
 // API: Upload Files (Batch)
 app.post('/api/upload', upload.array('files'), (req, res) => {
     try {
+        const protocol = req.protocol;
+        const host = req.get('host');
         const files = req.files.map(file => ({
             filename: file.filename,
             originalName: file.originalname,
-            url: `http://localhost:${PORT}/uploads/${file.filename}`
+            url: `${protocol}://${host}/uploads/${file.filename}`
         }));
         res.json({ success: true, data: files });
     } catch (error) {
@@ -94,10 +96,13 @@ app.post('/api/upload-url', async (req, res) => {
                 writer.on('error', reject);
             });
 
+            const protocol = req.protocol;
+            const host = req.get('host');
+
             results.push({
                 url: url,
                 success: true,
-                savedUrl: `http://localhost:${PORT}/uploads/${filename}`
+                savedUrl: `${protocol}://${host}/uploads/${filename}`
             });
         } catch (error) {
             console.error(`Failed to download ${url}:`, error.message);
@@ -117,13 +122,15 @@ app.get('/api/images', async (req, res) => {
     try {
         const files = await fs.readdir(UPLOADS_DIR);
         const imageFiles = [];
+        const protocol = req.protocol;
+        const host = req.get('host');
 
         for (const file of files) {
             const stat = await fs.stat(path.join(UPLOADS_DIR, file));
             if (stat.isFile()) {
                 imageFiles.push({
                     filename: file,
-                    url: `http://localhost:${PORT}/uploads/${file}`,
+                    url: `${protocol}://${host}/uploads/${file}`,
                     mtime: stat.mtime,
                     size: stat.size
                 });
